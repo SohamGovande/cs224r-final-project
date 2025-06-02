@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from typing import List, Tuple, Dict, Optional, Callable, Any
 from Levenshtein import ratio
 import traceback
+import sys, subprocess, tempfile, os, textwrap
 
 try:
     import signal
@@ -132,6 +133,36 @@ def clean_text(text: str, exclude_chars: List[str] = ['\n', '\r']) -> str:
     
     # Remove leading and trailing spaces and convert to lowercase
     return text.strip().rstrip('.').lower()
+
+def unit_test_rewards(prompt: str, candidate_code: str, test_code: str, entry_point: str) -> float:
+    """Return 1.0 if all unit tests pass, otherwise 0.0 (adapted from provided script)."""
+    candidate_block = "# MODEL COMPLETION\n" + candidate_code.rstrip()
+    indented_block = textwrap.indent(candidate_block, "    ")
+    harness_code = (
+        f"# PROMPT\n{prompt}\n"
+        f"{indented_block}\n\n"
+        f"{test_code}\n\n"
+        f"if __name__ == '__main__':\n"
+        f"    check({entry_point})\n"
+    )
+
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+        tmp.write(harness_code)
+        tmp_path = tmp.name
+
+    proc = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True)
+    os.unlink(tmp_path)
+
+    return 1.0 if proc.returncode == 0 else 0.0
+
+def unit_test_accuracy_reward(generated_code: str, *, prompt: str = "", test_code: str = None, entry_point, **kwargs) -> float:
+    """Wrapper around unit_test_rewards to fit the reward API used elsewhere."""
+    if test_code is None:
+        # No tests provided – cannot evaluate accuracy.
+        return 0.0
+
+    candidate_code = PythonCodeExecutor.extract_python_code(generated_code)
+    return unit_test_rewards(prompt, candidate_code, test_code, entry_point)
 
 def _python_syntax_reward(completions: str, **kwargs) -> float:
     assert type(completions) == str, f"completions must be a string, but got {type(completions)}"
@@ -305,7 +336,7 @@ def code_coverage_reward(generated_code: str, expected_code: str = None, test_co
 # Registry of all available reward functions
 REWARD_FUNCTIONS = {
     'format': python_syntax_reward,
-    'accuracy': python_execution_reward,
+    'accuracy': unit_test_accuracy_reward,
     # 'completeness': code_completeness_reward,
     # 'coverage': code_coverage_reward,
 }
