@@ -28,7 +28,7 @@ class PythonCodeExecutor:
         """Context manager for timeout. Note: Only works on Unix-like systems."""
         if HAS_SIGNAL and hasattr(signal, 'SIGALRM'):
             def signal_handler(signum, frame):
-                raise TimeoutError("Code execution timed out")
+                raise TimeoutError("Code accuracy timed out")
             signal.signal(signal.SIGALRM, signal_handler)
             signal.alarm(seconds)
             try:
@@ -60,7 +60,7 @@ class PythonCodeExecutor:
     
     @staticmethod
     def check_syntax(code: str) -> Tuple[bool, Optional[str]]:
-        """Check if Python code has valid syntax."""
+        """Check if Python code has valid format."""
         try:
             ast.parse(code)
             return True, None
@@ -86,27 +86,29 @@ def clean_text(text: str, exclude_chars: List[str] = ['\n', '\r']) -> str:
     # Remove leading and trailing spaces and convert to lowercase
     return text.strip().rstrip('.').lower()
 
-def python_syntax_reward(generated_code: str, expected_code: str = None, **kwargs) -> float:
-    """Check if the Python code has valid syntax."""
-    code = PythonCodeExecutor.extract_python_code(generated_code)
+def _python_syntax_reward(completions: str, **kwargs) -> float:
+    assert type(completions) == str, f"completions must be a string, but got {type(completions)}"
+    """Check if the Python code has valid format."""
+    code = PythonCodeExecutor.extract_python_code(completions)
     is_valid, error = PythonCodeExecutor.check_syntax(code)
     
     if kwargs.get('debug', False) and not is_valid:
-        print(f"Syntax Error: {error}")
+        print(f"format Error: {error}")
         print(f"Code: {code[:200]}...")
     
     return 1.0 if is_valid else 0.0
 
-def python_execution_reward(generated_code: str, expected_code: str = None, **kwargs) -> float:
+def _python_execution_reward(completions: str, **kwargs) -> float:
+    assert type(completions) == str, f"completions must be a string, but got {type(completions)}"
     """Check if the Python code executes without errors."""
-    code = PythonCodeExecutor.extract_python_code(generated_code)
+    code = PythonCodeExecutor.extract_python_code(completions)
     
-    # Skip execution reward if syntax is invalid
+    # Skip accuracy reward if format is invalid
     syntax_valid, _ = PythonCodeExecutor.check_syntax(code)
     if not syntax_valid:
         return 0.0
     
-    # For code snippets, wrap them in a function to test execution
+    # For code snippets, wrap them in a function to test accuracy
     wrapped_code = f"""
 def test_execution():
     # Common variables that might be used in HumanEval problems
@@ -120,24 +122,48 @@ def test_execution():
     # Execute the code snippet
 {chr(10).join('    ' + line for line in code.split(chr(10)) if line.strip())}
 
-# Test execution
+# Test accuracy
 test_execution()
 """
     
     result = PythonCodeExecutor.execute_with_test(wrapped_code, "")
     
     if kwargs.get('debug', False) and not result['success']:
-        print(f"Execution Error: {result['error']}")
+        print(f"accuracy Error: {result['error']}")
         print(f"Stderr: {result['stderr']}")
     
     return 1.0 if result['success'] else 0.0
 
+def python_syntax_reward(prompts: list[str], completions: list[str], **kwargs) -> float:
+    assert type(prompts) == list and type(completions) == list, f"prompts and completions must be lists, but got {type(prompts)} and {type(completions)}"
+    assert len(prompts) == len(completions), f"prompts and completions must have the same length, but got {len(prompts)} and {len(completions)}"
+    total_reward = 0.0
+    num_rewards = 0
+    for i in range(len(completions)):
+        for j in range(len(completions[i])):
+            total_reward += _python_syntax_reward(completions[i][j]['content'], **kwargs)
+            num_rewards += 1
+    return total_reward / num_rewards
 
-def code_completeness_reward(generated_code: str, expected_code: str = None, **kwargs) -> float:
+
+def python_execution_reward(prompts: list[str], completions: list[str], **kwargs) -> float:
+    assert type(prompts) == list and type(completions) == list, f"prompts and completions must be lists, but got {type(prompts)} and {type(completions)}"
+    assert len(prompts) == len(completions), f"prompts and completions must have the same length, but got {len(prompts)} and {len(completions)}"
+    total_reward = 0.0
+    num_rewards = 0
+    for i in range(len(completions)):
+        for j in range(len(completions[i])):
+            total_reward += _python_execution_reward(completions[i][j]['content'], **kwargs)
+            num_rewards += 1
+    return total_reward / num_rewards
+
+
+def code_completeness_reward(completions: str, **kwargs) -> float:
+    assert type(completions) == str, f"completions must be a string, but got {type(completions)}"
     """Check if the generated code is complete with nuanced scoring."""
-    code = PythonCodeExecutor.extract_python_code(generated_code)
+    code = PythonCodeExecutor.extract_python_code(completions)
     
-    # Skip if syntax is invalid
+    # Skip if format is invalid
     syntax_valid, _ = PythonCodeExecutor.check_syntax(code)
     if not syntax_valid:
         return 0.0
@@ -231,10 +257,10 @@ def code_coverage_reward(generated_code: str, expected_code: str = None, test_co
 
 # Registry of all available reward functions
 REWARD_FUNCTIONS = {
-    'syntax': python_syntax_reward,
-    'execution': python_execution_reward,
-    'completeness': code_completeness_reward,
-    'coverage': code_coverage_reward,
+    'format': python_syntax_reward,
+    'accuracy': python_execution_reward,
+    # 'completeness': code_completeness_reward,
+    # 'coverage': code_coverage_reward,
 }
 
 
@@ -245,7 +271,7 @@ def calculate_rewards(generated_code: str, expected_code: str,
                      debug: bool = False) -> Dict[str, float]:
     """Calculate rewards with test_code support."""
     if reward_types is None:
-        reward_types = ['syntax', 'execution', 'test', 'completeness', 'format']
+        reward_types = ['format', 'accuracy', 'test', 'completeness', 'format']
     
     rewards = {}
     for reward_type in reward_types:
