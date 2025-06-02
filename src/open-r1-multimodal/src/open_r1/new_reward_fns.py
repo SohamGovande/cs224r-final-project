@@ -28,7 +28,7 @@ class PythonCodeExecutor:
         """Context manager for timeout. Note: Only works on Unix-like systems."""
         if HAS_SIGNAL and hasattr(signal, 'SIGALRM'):
             def signal_handler(signum, frame):
-                raise TimeoutError("Code accuracy timed out")
+                raise TimeoutError("Code execution timed out")
             signal.signal(signal.SIGALRM, signal_handler)
             signal.alarm(seconds)
             try:
@@ -60,12 +60,59 @@ class PythonCodeExecutor:
     
     @staticmethod
     def check_syntax(code: str) -> Tuple[bool, Optional[str]]:
-        """Check if Python code has valid format."""
+        """Check if Python code has valid syntax."""
         try:
             ast.parse(code)
             return True, None
         except SyntaxError as e:
             return False, f"Line {e.lineno}: {e.msg}"
+    
+    @staticmethod
+    def execute_with_test(code: str, test_code: str, timeout: int = 5) -> Dict[str, any]:
+        """Execute Python code with test cases."""
+        full_code = code + "\n\n" + test_code
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(full_code)
+            f.flush()
+            
+            try:
+                result = subprocess.run(
+                    [sys.executable, f.name],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout
+                )
+                
+                success = result.returncode == 0
+                stdout = result.stdout
+                stderr = result.stderr
+                
+                return {
+                    'success': success,
+                    'stdout': stdout,
+                    'stderr': stderr,
+                    'error': stderr if stderr else None
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    'success': False,
+                    'stdout': '',
+                    'stderr': 'Execution timed out',
+                    'error': 'Timeout'
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'stdout': '',
+                    'stderr': str(e),
+                    'error': str(e)
+                }
+            finally:
+                try:
+                    os.unlink(f.name)
+                except:
+                    pass
 
 def clean_text(text: str, exclude_chars: List[str] = ['\n', '\r']) -> str:
     """Clean and normalize text for comparison."""
