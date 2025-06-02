@@ -44,6 +44,8 @@ import math
 from open_r1.qwen2_5vl_monkey_patch import monkey_patch_qwen2_5vl_flash_attn, monkey_patch_qwen2_5vl_forward
 monkey_patch_qwen2_5vl_flash_attn()
 
+from new_reward_fns import REWARD_FUNCTIONS
+
 
 # ----------------------- Main Script -----------------------
 @dataclass
@@ -208,10 +210,7 @@ def main(script_args, training_args, model_args):
     vlm_module_cls = get_vlm_module(model_args.model_name_or_path)
 
     # Load the reward functions
-    reward_funcs_registry = {
-        "accuracy": vlm_module_cls.iou_reward,
-        "format": vlm_module_cls.format_reward_rec,
-    }
+    reward_funcs_registry = REWARD_FUNCTIONS
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
     print("reward_funcs:", reward_funcs)
 
