@@ -246,13 +246,12 @@ test_execution()
 def python_syntax_reward(prompts: list[str], completions: list[str], **kwargs) -> float:
     assert type(prompts) == list and type(completions) == list, f"prompts and completions must be lists, but got {type(prompts)} and {type(completions)}"
     assert len(prompts) == len(completions), f"prompts and completions must have the same length, but got {len(prompts)} and {len(completions)}"
-    total_reward = 0.0
-    num_rewards = 0
+    rewards = []
     for i in range(len(completions)):
         for j in range(len(completions[i])):
-            total_reward += _python_syntax_reward(completions[i][j]['content'], **kwargs)
-            num_rewards += 1
-    return total_reward / num_rewards
+            reward = _python_syntax_reward(completions[i][j]['content'], **kwargs)
+            rewards.append(reward)
+    return rewards
 
 
 def python_execution_reward(prompts: list[str], completions: list[str], **kwargs) -> float:
@@ -261,6 +260,7 @@ def python_execution_reward(prompts: list[str], completions: list[str], **kwargs
     total_reward = 0.0
     num_rewards = 0
     ids, prompts, test_codes, entry_points, function_headers = kwargs['id'], kwargs['problem'], kwargs['test_code'], kwargs['entry_point'], kwargs['function_header']
+    rewards = []
 
     print('Testing python execution reward')
     for i in range(len(completions)):
@@ -269,11 +269,9 @@ def python_execution_reward(prompts: list[str], completions: list[str], **kwargs
             test_code = test_codes[i]
             entry_point = entry_points[i]
             function_header = function_headers[i]
-            total_reward += _unit_test_reward(completions[i][j]['content'], function_header, test_code, entry_point, should_indent=True)
-            total_reward += _unit_test_reward(completions[i][j]['content'], "", test_code, entry_point, should_indent=False)
-            num_rewards += 1
-    print('...done')
-    return total_reward / num_rewards
+            reward = max(_unit_test_reward(completions[i][j]['content'], function_header, test_code, entry_point, should_indent=True), _unit_test_reward(completions[i][j]['content'], "", test_code, entry_point, should_indent=False))
+            rewards.append(reward)
+    return rewards
 
 
 def code_completeness_reward(completions: str, **kwargs) -> float:
