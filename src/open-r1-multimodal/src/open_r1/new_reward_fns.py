@@ -174,8 +174,8 @@ def _unit_test_reward(generated_code: str, function_header: str, test_code: str,
         return 0.0
 
     candidate_code = PythonCodeExecutor.extract_python_code(generated_code)
-    # prompt_name = f"data/{entry_point}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    # return __unit_test_reward(function_header, candidate_code, test_code, entry_point, **kwargs)
+    return __unit_test_reward(function_header, candidate_code, test_code, entry_point, **kwargs)
+
     try:
         # with open(prompt_name, 'w') as f:
         #     f.write(candidate_code)

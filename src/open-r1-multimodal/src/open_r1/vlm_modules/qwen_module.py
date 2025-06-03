@@ -65,8 +65,8 @@ class Qwen2VLModule(VLMBaseModule):
     
     @staticmethod
     def get_question_template(task_type: str):
-        # return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer as ONLY Python code. Include the existing function heading in the Python code. Example of well-formatted answer: <answer>import math\nb=2\ndef add_two(a):\n    return a+b</answer>"
-        return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer in a JSON block formatted as follows: <answer>{{\"language\": \"python\", \"code\": \"<python_code>\"}}</answer>"
+        return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer as ONLY Python code. Include the existing function heading in the Python code. Example of well-formatted answer: <answer>import math\nb=2\ndef add_two(a):\n    return a+b</answer>"
+        # return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer in a JSON block formatted as follows: <answer>{{\"language\": \"python\", \"code\": \"<python_code>\"}}</answer>"
             
     @staticmethod
     def format_reward_rec(completions, **kwargs):

@@ -12,7 +12,7 @@ echo "image_folders: $image_folders"
 rm src/open-r1-multimodal/data/*
 rm src/open-r1-multimodal/data-json/*
 
-export EXP_NAME="json-output-and-accuracy"
+export EXP_NAME="accuracy-diff-rewards"
 TASK_TYPE="rec"
 cd ${REPO_HOME}/src/open-r1-multimodal
 
