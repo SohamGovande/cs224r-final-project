@@ -65,21 +65,8 @@ class Qwen2VLModule(VLMBaseModule):
     
     @staticmethod
     def get_question_template(task_type: str):
-        match task_type:
-            case "rec":
-                return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer in JSON format."
-            case "ic":
-                return "{Question} First thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think><answer> json format answer here </answer>"
-            case "odLength":
-                SYSTEM_PROMPT = (
-                    #"A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant "
-                    "First thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning "
-                    "process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., "
-                    "<think> reasoning process here </think><answer> answer here </answer>"
-                )
-                return SYSTEM_PROMPT + '\n' + "{Question}"
-            case _:
-                return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags."
+        # return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer as ONLY Python code. Include the existing function heading in the Python code. Example of well-formatted answer: <answer>import math\nb=2\ndef add_two(a):\n    return a+b</answer>"
+        return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. Output the final answer in a JSON block formatted as follows: <answer>{{\"language\": \"python\", \"code\": \"<python_code>\"}}</answer>"
             
     @staticmethod
     def format_reward_rec(completions, **kwargs):

@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+train2014/
 
 # Distribution / packaging
 .Python

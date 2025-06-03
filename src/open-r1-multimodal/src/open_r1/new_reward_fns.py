@@ -134,10 +134,15 @@ def clean_text(text: str, exclude_chars: List[str] = ['\n', '\r']) -> str:
     # Remove leading and trailing spaces and convert to lowercase
     return text.strip().rstrip('.').lower()
 
-def unit_test_rewards(prompt: str, candidate_code: str, test_code: str, entry_point: str) -> float:
+def __unit_test_reward(prompt: str, candidate_code: str, test_code: str, entry_point: str, **kwargs) -> float:
     """Return 1.0 if all unit tests pass, otherwise 0.0 (adapted from provided script)."""
     candidate_block = "# MODEL COMPLETION\n" + candidate_code.rstrip()
-    indented_block = textwrap.indent(candidate_block, "    ")
+    should_indent = kwargs.get('should_indent', True)
+    if should_indent:
+        indented_block = textwrap.indent(candidate_block, "    ")
+    else:
+        indented_block = candidate_block
+    
     harness_code = (
         f"# PROMPT\n{prompt}\n"
         f"{indented_block}\n\n"
@@ -146,25 +151,51 @@ def unit_test_rewards(prompt: str, candidate_code: str, test_code: str, entry_po
         f"    check({entry_point})\n"
     )
 
+    prompt_name = f"data-json/{entry_point}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    with open(prompt_name, 'w') as f:
+        f.write(harness_code)
+
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
         tmp.write(harness_code)
         tmp_path = tmp.name
 
-    proc = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True)
-    os.unlink(tmp_path)
+    try:
+        proc = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True, timeout=5)
+        return 1.0 if proc.returncode == 0 else 0.0
+    except subprocess.TimeoutExpired:
+        return 0.0
+    finally:
+        os.unlink(tmp_path)
 
-    return 1.0 if proc.returncode == 0 else 0.0
-
-def unit_test_accuracy_reward(generated_code: str, *, prompt: str = "", test_code: str = None, entry_point, **kwargs) -> float:
+def _unit_test_reward(generated_code: str, function_header: str, test_code: str, entry_point: str, **kwargs) -> float:
     """Wrapper around unit_test_rewards to fit the reward API used elsewhere."""
     if test_code is None:
         # No tests provided – cannot evaluate accuracy.
         return 0.0
 
     candidate_code = PythonCodeExecutor.extract_python_code(generated_code)
-    return unit_test_rewards(prompt, candidate_code, test_code, entry_point)
+    # prompt_name = f"data/{entry_point}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    # return __unit_test_reward(function_header, candidate_code, test_code, entry_point, **kwargs)
+    try:
+        # with open(prompt_name, 'w') as f:
+        #     f.write(candidate_code)
+        json_code = json.loads(candidate_code.strip())
+        candidate_code = json_code['code']
+        candidate_language = json_code['language']
+        if candidate_language != 'python': raise ValueError(f"Candidate language is {candidate_language}, not python")
+        if len(candidate_code) < 100: raise ValueError(f"Candidate code is too short: {candidate_code}")
+        # return 1
+        return 0.5 + 0.5 * __unit_test_reward(function_header, candidate_code, test_code, entry_point, **kwargs)
+    except (ValueError, KeyError, json.JSONDecodeError, TypeError, AttributeError) as e:
+        print(f"Error parsing generated code: {e}")
+        return 0.0
+    
+
+    # return __unit_test_reward(function_header, candidate_code, test_code, entry_point, **kwargs)
 
 def _python_syntax_reward(completions: str, **kwargs) -> float:
+    return 0
+
     assert type(completions) == str, f"completions must be a string, but got {type(completions)}"
     """Check if the Python code has valid format."""
     code = PythonCodeExecutor.extract_python_code(completions)
@@ -229,10 +260,19 @@ def python_execution_reward(prompts: list[str], completions: list[str], **kwargs
     assert len(prompts) == len(completions), f"prompts and completions must have the same length, but got {len(prompts)} and {len(completions)}"
     total_reward = 0.0
     num_rewards = 0
+    ids, prompts, test_codes, entry_points, function_headers = kwargs['id'], kwargs['problem'], kwargs['test_code'], kwargs['entry_point'], kwargs['function_header']
+
+    print('Testing python execution reward')
     for i in range(len(completions)):
         for j in range(len(completions[i])):
-            total_reward += _python_execution_reward(completions[i][j]['content'], **kwargs)
+            prompt = prompts[i]
+            test_code = test_codes[i]
+            entry_point = entry_points[i]
+            function_header = function_headers[i]
+            total_reward += _unit_test_reward(completions[i][j]['content'], function_header, test_code, entry_point, should_indent=True)
+            total_reward += _unit_test_reward(completions[i][j]['content'], "", test_code, entry_point, should_indent=False)
             num_rewards += 1
+    print('...done')
     return total_reward / num_rewards
 
 
@@ -336,7 +376,7 @@ def code_coverage_reward(generated_code: str, expected_code: str = None, test_co
 # Registry of all available reward functions
 REWARD_FUNCTIONS = {
     'format': python_syntax_reward,
-    'accuracy': unit_test_accuracy_reward,
+    'accuracy': python_execution_reward,
     # 'completeness': code_completeness_reward,
     # 'coverage': code_coverage_reward,
 }

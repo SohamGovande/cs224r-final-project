@@ -2,14 +2,17 @@ PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 export REPO_HOME="${PROJECT_ROOT}"
 echo "REPO_HOME: $REPO_HOME"
 # Change the data_paths and image_folders to your own data
-data_paths="/home/sgovande/lustre/vlm-r1/data/mini.jsonl" 
-image_folders="/home/sgovande/lustre/vlm-r1/"
+data_paths="/home/sgovande/lustre/data/full.jsonl" 
+image_folders="/home/sgovande/lustre/"
 model_path="Qwen/Qwen2.5-VL-3B-Instruct"
 is_reward_customized_from_vlm_module=False
 echo "data_paths: $data_paths"
 echo "image_folders: $image_folders"
 
-export EXP_NAME="Qwen2.5-VL-3B-Instruct-rec" # TODO: change this to your own experiment name
+rm src/open-r1-multimodal/data/*
+rm src/open-r1-multimodal/data-json/*
+
+export EXP_NAME="json-output-and-accuracy"
 TASK_TYPE="rec"
 cd ${REPO_HOME}/src/open-r1-multimodal
 

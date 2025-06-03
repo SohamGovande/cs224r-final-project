@@ -88,7 +88,8 @@ SYSTEM_PROMPT = (
     "A conversation between User and Assistant. The user asks a question, and the Assistant solves it. The assistant "
     "first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning "
     "process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., "
-    "<think> reasoning process here </think><answer> answer here </answer>"
+    "<think> reasoning process here </think><answer> answer here </answer>. "
+    "Output the final answer as ONLY Python code. Do NOT include the function heading in the Python code - just complete the existing function in the answer block, assuming that your output is placed right after the existing function. Example: <answer>b=2\nreturn a+b</answer>"
 )
 
 class LazySupervisedDataset(Dataset):
